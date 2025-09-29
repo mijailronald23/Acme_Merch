@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Create Product</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    .success { color: green; font-weight: bold; }
+    .error { color: red; font-weight: bold; }
+    form { margin-bottom: 20px; }
+    label { display:block; margin-top:10px; }
+  </style>
+</head>
+<body>
+  <h1>Create Product</h1>
+  <form id="productForm" method="post">
+    {% csrf_token %}
+    <label>SKU: <input type="text" name="sku" required></label>
+    <label>Name: <input type="text" name="name" required></label>
+    <label>Price: <input type="number" name="price" step="0.01" required></label>
+    <label>Stock: <input type="number" name="stock" min="0" required></label>
+    <button type="submit">Create</button>
+  </form>
+
+  <div id="message"></div>
+  <pre id="result"></pre>
+
+  <script>
+    const form = document.getElementById("productForm");
+    const messageBox = document.getElementById("message");
+    const resultBox = document.getElementById("result");
+
+    function getCsrfToken() {
+      const el = document.querySelector('input[name="csrfmiddlewaretoken"]');
+      return el ? el.value : "";
+    }
+
+    form.addEventListener("submit", async function (e) {
+      e.preventDefault();
+      const csrfToken = getCsrfToken();
+      const formData = new FormData(form);
+      const payload = Object.fromEntries(formData.entries());
+
+      try {
+        const response = await fetch("/api/products/", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": csrfToken,
+            "X-Requested-With": "XMLHttpRequest"
+          },
+          credentials: "same-origin",
+          body: JSON.stringify(payload),
+        });
+
+        const text = await response.text();
+        let data;
+        try { data = JSON.parse(text); }
+        catch {
+          const win = window.open('', '_blank', 'width=900,height=700');
+          if (win) { win.document.write(text); win.document.close(); }
+          throw new Error("Server returned HTML — check the new tab & server logs.");
+        }
+
+        resultBox.textContent = JSON.stringify(data, null, 2);
+
+        if (response.ok) {
+          messageBox.textContent = "✅ Product created successfully! You can create another one below.";
+          messageBox.className = "success";
+          form.reset();
+        } else {
+          messageBox.textContent = "❌ Error: " + (data.detail || "Check your input");
+          messageBox.className = "error";
+        }
+      } catch (err) {
+        messageBox.textContent = "❌ Network/parse error: " + err.message;
+        messageBox.className = "error";
+      }
+    });
+  </script>
+</body>
+</html>
+

@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Place Order</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    .success { color: green; font-weight: bold; }
+    .error { color: red; font-weight: bold; }
+    label { display:block; margin-top:10px; }
+    pre { background:#f5f5f5; padding:10px; }
+  </style>
+</head>
+<body>
+  <h1>Place Order</h1>
+  <form id="orderForm" method="post">
+    {% csrf_token %}
+    <label>
+      Product:
+      <select name="product_id" id="productSelect" required></select>
+    </label>
+    <label>
+      Quantity:
+      <input type="number" name="quantity" id="qtyInput" min="1" value="1" required />
+    </label>
+    <button type="submit">Create Order</button>
+  </form>
+
+  <div id="message"></div>
+  <p><strong>HTTP status:</strong> <span id="status">(none)</span></p>
+  <p><strong>Raw response:</strong></p>
+  <pre id="raw"></pre>
+  <p><strong>Parsed JSON:</strong></p>
+  <pre id="result"></pre>
+
+  <h2>Orders list</h2>
+  <pre id="ordersList"></pre>
+
+  <script>
+    const form = document.getElementById('orderForm');
+    const messageBox = document.getElementById('message');
+    const resultBox = document.getElementById('result');
+    const rawBox = document.getElementById('raw');
+    const statusBox = document.getElementById('status');
+    const ordersListBox = document.getElementById('ordersList');
+    const productSelect = document.getElementById('productSelect');
+
+    async function loadProducts() {
+      const res = await fetch('/api/products/');
+      const products = await res.json();
+      productSelect.innerHTML = '';
+      for (const p of products) {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = `${p.id} — ${p.sku} — ${p.name} (stock: ${p.stock})`;
+        productSelect.appendChild(opt);
+      }
+    }
+
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Place Order</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    .success { color: green; font-weight: bold; }
+    .error { color: red; font-weight: bold; }
+    label { display:block; margin-top:10px; }
+    pre { background:#f5f5f5; padding:10px; }
+    button[disabled] { opacity: 0.6; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+  <h1>Place Order</h1>
+  <form id="orderForm" method="post" autocomplete="off" novalidate>
+    {% csrf_token %}
+    <label>
+      Product:
+      <select name="product_id" id="productSelect" required></select>
+    </label>
+    <label>
+      Quantity:
+      <input type="number" name="quantity" id="qtyInput" min="1" value="1" required />
+    </label>
+    <button type="submit" id="submitBtn" disabled>Create Order</button>
+  </form>
+
+  <div id="message"></div>
+  <p><strong>HTTP status:</strong> <span id="status">(none)</span></p>
+  <p><strong>Raw response:</strong></p>
+  <pre id="raw"></pre>
+  <p><strong>Parsed JSON:</strong></p>
+  <pre id="result"></pre>
+
+  <h2>Orders list</h2>
+  <pre id="ordersList"></pre>
+
+  <script>
+    const form = document.getElementById('orderForm');
+    const messageBox = document.getElementById('message');
+    const resultBox = document.getElementById('result');
+    const rawBox = document.getElementById('raw');
+    const statusBox = document.getElementById('status');
+    const ordersListBox = document.getElementById('ordersList');
+    const productSelect = document.getElementById('productSelect');
+    const qtyInput = document.getElementById('qtyInput');
+    const submitBtn = document.getElementById('submitBtn');
+
+    function getCsrfToken() {
+      const el = document.querySelector('input[name="csrfmiddlewaretoken"]');
+      return el ? el.value : '';
+    }
+
+    async function loadProducts() {
+      submitBtn.disabled = true;
+      const res = await fetch('/api/products/?_=' + Date.now(), { cache: 'no-store' });
+      const products = await res.json();
+      productSelect.innerHTML = '';
+      for (const p of products) {
+        const opt = document.createElement('option');
+        opt.value = String(p.id);
+        opt.textContent = `${p.id} — ${p.sku} — ${p.name} (stock: ${p.stock})`;
+        productSelect.appendChild(opt);
+      }
+      submitBtn.disabled = products.length === 0;
+    }
+
+    async function loadOrders() {
+      const res = await fetch('/api/orders/?_=' + Date.now(), { cache: 'no-store' });
+      const text = await res.text();
+      ordersListBox.textContent = text;
+    }
+
+    function isValidInteger(n) {
+      return Number.isInteger(n) && Number.isFinite(n);
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      // validações de cliente: impedem NaN -> null no JSON
+      const pid = Number(productSelect.value);
+      const qty = Number(qtyInput.value);
+
+      if (!isValidInteger(pid) || pid <= 0) {
+        messageBox.className = 'error';
+        messageBox.textContent = '❌ Invalid product. Please select a product again.';
+        productSelect.focus();
+        return;
+      }
+      if (!isValidInteger(qty) || qty <= 0) {
+        messageBox.className = 'error';
+        messageBox.textContent = '❌ Quantity must be a positive integer.';
+        qtyInput.focus();
+        return;
+      }
+
+      const csrf = getCsrfToken();
+      const payload = {
+        items: [{ product_id: pid, quantity: qty }]
+      };
+
+      try {
+        const response = await fetch('/api/orders/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrf,
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          credentials: 'same-origin',
+          body: JSON.stringify(payload)
+        });
+
+        statusBox.textContent = response.status + ' ' + response.statusText;
+        const text = await response.text();
+        rawBox.textContent = text;
+
+        let data;
+        try { data = JSON.parse(text); }
+        catch {
+          const win = window.open('', '_blank', 'width=900,height=700');
+          if (win) { win.document.write(text); win.document.close(); }
+          throw new Error('Server returned HTML — check server logs.');
+        }
+
+        resultBox.textContent = JSON.stringify(data, null, 2);
+
+        if (response.ok) {
+          messageBox.className = 'success';
+          messageBox.textContent = `✅ Order created. View: /api/orders/${data.id}/`;
+          await loadOrders(); // força recarregar a lista
+        } else {
+          // Mostra mensagens detalhadas vindas do backend (ser.errors)
+          const detail = data.detail || '';
+          const errors = data.errors ? JSON.stringify(data.errors) : '';
+          messageBox.className = 'error';
+          messageBox.textContent = '❌ Error: ' + (detail || errors || 'Check your input');
+        }
+      } catch (err) {
+        messageBox.className = 'error';
+        messageBox.textContent = '❌ Network/parse error: ' + err.message;
+      }
+    });
+
+    // inicial
+    loadProducts().then(loadOrders);
+  </script>
+</body>
+</html>
